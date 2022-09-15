@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-       /**
+    /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
@@ -27,58 +27,62 @@ class AuthController extends Controller
     //
     public function register(Request $request)
     {
-
         $rules = [
             'name' => 'required|string',
+            'mobile' => 'nullable|string|size:10',
             'email' => 'required|string|email|unique:users',
-            'password' => 'required|string|confirmed'
+            'password' => 'required|min:8|max:20|string|confirmed'
         ];
-
-        // $fields = $request->validate([
-        //     'name' => 'required|string',
-        //     'email' => 'required|string|email|unique:users',
-        //     'password' => 'required|string|confirmed'
-        // ]);
 
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response([
-                'responseCode' => 422,
-                'errors'=>$validator->errors()
+                'error' => true,
+                'errors' => $validator->errors()
             ]);
-        }else {
+        } else {
             $user = User::create([
                 'name' => $request['name'],
+                'mobile' => $request['mobile'],
                 'email' => $request['email'],
                 'password' => bcrypt($request['password'])
             ]);
 
             $token = $user->createToken('authToken')->plainTextToken;
 
-            return response(['status'=>'success','user' => $user, 'token' => $token], Response::HTTP_CREATED);
+            return response(['error' => false, 'user' => $user, 'token' => $token], Response::HTTP_CREATED);
         }
-
-
     }
 
     public function login(Request $request)
     {
-        $fields = $request->validate([
-            'email' => 'required|string|email',
-            'password' => 'required|string'
-        ]);
 
-        $user = User::where('email', $fields['email'])->first();
+        $rules = [
+            'email' => 'required|string|email|exists:users',
+            'password' => 'required|min:8|max:20|string'
+        ];
 
-        if (!$user || !Hash::check($fields['password'], $user->password)) {
-            return response(['status'=>'failure','message' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response([
+                'error' => true,
+                'errors' => $validator->errors()
+            ], 401);
+        } else {
+            $user = User::where('email', $request['email'])->first();
+
+            if (!$user || !Hash::check($request['password'], $user->password)) {
+                return response()->json(['error' => true, 'message' => 'Invalid credentials']);
+            }
+
+
+            $token = $user->createToken('authToken')->plainTextToken;
+
+            return response(['error' => false, 'user' => $user, 'token' => $token], Response::HTTP_CREATED);
         }
 
-
-        $token = $user->createToken('authToken')->plainTextToken;
-
-        return response(['status'=>'success','user' => $user, 'token' => $token], Response::HTTP_CREATED);
     }
 
     public function logout(Request $request)
@@ -89,7 +93,7 @@ class AuthController extends Controller
 
         // auth()->user()->tokens->delete();
 
-        return response(['status'=>'success','message' => 'Successfully logged out']);
+        return response(['error' => false, 'message' => 'Successfully logged out']);
     }
 
 
@@ -118,6 +122,7 @@ class AuthController extends Controller
         //
         $fields = $request->validate([
             'name' => 'string',
+            'mobile' => 'string|size:10',
             'email' => 'string|email',
             'password' => 'string'
         ]);
@@ -132,7 +137,7 @@ class AuthController extends Controller
 
         // $user->update($request->all());
 
-        return response(['status'=>'success','user' => $user]);
+        return response(['error' => false, 'user' => $user]);
 
         // return $user;
 
@@ -149,7 +154,7 @@ class AuthController extends Controller
     {
         //
         $res = User::destroy($id);
-        return response(['status'=>'success','message' => 'User deleted successfully.', 'serverResponse'=> $res]);
+        return response(['error' => false, 'message' => 'User deleted successfully.', 'serverResponse' => $res]);
     }
 
     /**
